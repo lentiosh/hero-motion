@@ -1,0 +1,116 @@
+name: Render Instagram Videos
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      composition:
+        description: "Composition to render (leave empty for all)"
+        required: false
+        default: ""
+
+jobs:
+  render:
+    name: Render Videos
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chrome for Puppeteer
+        run: npx remotion browser ensure
+
+      - name: Render Instagram Story (Neon)
+        if: ${{ github.event.inputs.composition == '' || github.event.inputs.composition == 'InstagramStory' }}
+        run: |
+          mkdir -p out
+          npx remotion render src/index.ts InstagramStory out/instagram-story-neon.mp4 \
+            --codec=h264 \
+            --jpeg-quality=80
+
+      - name: Render Instagram Story (Gold)
+        if: ${{ github.event.inputs.composition == '' || github.event.inputs.composition == 'InstagramStory_Gold' }}
+        run: |
+          npx remotion render src/index.ts InstagramStory_Gold out/instagram-story-gold.mp4 \
+            --codec=h264 \
+            --jpeg-quality=80
+
+      - name: Render Instagram Reel
+        if: ${{ github.event.inputs.composition == '' || github.event.inputs.composition == 'InstagramReel' }}
+        run: |
+          npx remotion render src/index.ts InstagramReel out/instagram-reel.mp4 \
+            --codec=h264 \
+            --jpeg-quality=80
+
+      - name: Render Instagram Post (Ocean)
+        if: ${{ github.event.inputs.composition == '' || github.event.inputs.composition == 'InstagramPost' }}
+        run: |
+          npx remotion render src/index.ts InstagramPost out/instagram-post-ocean.mp4 \
+            --codec=h264 \
+            --jpeg-quality=80
+
+      - name: Render Instagram Post (Forest)
+        if: ${{ github.event.inputs.composition == '' || github.event.inputs.composition == 'InstagramPost_Forest' }}
+        run: |
+          npx remotion render src/index.ts InstagramPost_Forest out/instagram-post-forest.mp4 \
+            --codec=h264 \
+            --jpeg-quality=80
+
+      - name: Render Promo Video
+        if: ${{ github.event.inputs.composition == '' || github.event.inputs.composition == 'PromoVideo' }}
+        run: |
+          npx remotion render src/index.ts PromoVideo out/promo-video.mp4 \
+            --codec=h264 \
+            --jpeg-quality=80
+
+      - name: Render Sale Announcement
+        if: ${{ github.event.inputs.composition == '' || github.event.inputs.composition == 'SaleAnnouncement' }}
+        run: |
+          npx remotion render src/index.ts SaleAnnouncement out/sale-announcement.mp4 \
+            --codec=h264 \
+            --jpeg-quality=80
+
+      - name: Upload rendered videos
+        uses: actions/upload-artifact@v4
+        with:
+          name: instagram-videos-${{ github.sha }}
+          path: out/
+          retention-days: 30
+
+      - name: Create release with videos
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ github.run_number }}"
+          name: "Rendered Videos — Build #${{ github.run_number }}"
+          body: |
+            Automatically rendered Instagram promotional videos.
+
+            ## Compositions rendered
+            - `instagram-story-neon.mp4` — 1080×1920 · 15s · Neon theme
+            - `instagram-story-gold.mp4` — 1080×1920 · 15s · Gold/Luxury theme
+            - `instagram-reel.mp4` — 1080×1920 · 5s · Sunset theme
+            - `instagram-post-ocean.mp4` — 1080×1080 · 8s · Ocean/Tech theme
+            - `instagram-post-forest.mp4` — 1080×1080 · 8s · Forest/Eco theme
+            - `promo-video.mp4` — 1080×1920 · 7s · Full promo with countdown
+            - `sale-announcement.mp4` — 1080×1080 · 6s · Flash sale
+          files: out/*.mp4
+          generate_release_notes: false
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
